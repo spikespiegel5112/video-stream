@@ -11,6 +11,7 @@ using namespace std;
 
 #pragma comment(lib, "avformat.lib")
 #pragma comment(lib, "avutil.lib")
+#pragma comment(lib, "avcodec.lib")
 
 int onError(int errNum) {
 	char buf[1024] = { 0 };
@@ -20,12 +21,17 @@ int onError(int errNum) {
 }
 
 int main(int argc, char* argv[]) {
+
+	//初始化封装和解封装	
 	//av_register_all();
 	avformat_network_init();
 
 	AVFormatContext* ictx = NULL;
-	char inUrl[] = "assets/test.mp4";
+	char inUrl[] = "assets/test.flv";
+	char outUrl[] = "rtmp://192.168.204.130/live";
 
+	//输入流 1 打开文件，解封装
+	//输入封装上下文
 	int result = avformat_open_input(&ictx, inUrl, 0, 0);
 
 	cout << result << endl;
@@ -38,9 +44,50 @@ int main(int argc, char* argv[]) {
 
 	av_dump_format(ictx, 0, inUrl, 0);
 
+	//输出流
+
+	//创建输出流上下文
+	AVFormatContext* octx = NULL;
+	result = avformat_alloc_output_context2(&octx, 0, "flv", outUrl);
+	if (!octx) {
+		return onError(result);
+	}
+	cout << "octx create success!" << endl;
+
+	//配置输出流
+	//遍历输入的AVSream
+	for (int i = 0;i < ictx->nb_streams;i++) {
+		AVCodec* codec = avcodec_find_decoder(ictx->streams[i]->codecpar->codec_id);
+		AVStream* out = avformat_new_stream(octx, codec);
+		if (!out) {
+			return onError(0);
+		}
+
+		//复制配置信息，用于MP4
+		//result = avcodec_copy_context(out->codec, ictx->streams[i]->codec);
+		result = avcodec_parameters_copy(out->codecpar, ictx->streams[i]->codecpar);
+		out->codecpar->codec_tag = 0;
+	}
+	av_dump_format(octx, 0, outUrl, 1);
+
+
+	//rtmp推流
+
+	//打开io
+	result = avio_open(&octx->pb, outUrl, AVIO_FLAG_WRITE);
+	if (!octx->pb) {
+		return onError(result);
+	}
+
+	//写入头信息
+	result = avformat_write_header(octx, 0);
+	if (result < 0) {
+		return onError(result);
+	}
+	cout << "avformat_write_header " << result << endl;
+
 
 	getchar();
-
 	return 0;
 }
 
