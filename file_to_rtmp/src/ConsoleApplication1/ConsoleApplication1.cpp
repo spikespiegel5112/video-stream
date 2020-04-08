@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
 	AVFormatContext* ictx = NULL;
 	char inUrl[] = "assets/test.flv";
-	char outUrl[] = "rtmp://192.168.204.130/live";
+	char outUrl[] = "rtmp://192.168.204.132/live";
 
 	//输入流 1 打开文件，解封装
 	//输入封装上下文
@@ -55,9 +55,10 @@ int main(int argc, char* argv[]) {
 	cout << "octx create success!" << endl;
 
 	//配置输出流
-	//遍历输入的AVSream
+	//遍历输入的AVStream
 	for (int i = 0;i < ictx->nb_streams;i++) {
 		AVCodec* codec = avcodec_find_decoder(ictx->streams[i]->codecpar->codec_id);
+		cout << "codec++++" << codec << endl;
 		AVStream* out = avformat_new_stream(octx, codec);
 		if (!out) {
 			return onError(0);
@@ -85,6 +86,18 @@ int main(int argc, char* argv[]) {
 		return onError(result);
 	}
 	cout << "avformat_write_header " << result << endl;
+
+	//推流每一帧数据
+	AVPacket pkt;
+	for (;;) {
+		result = av_read_frame(ictx, &pkt);
+		if (result != 0) {
+			break;
+		}
+
+		//av_packet_unref(&pkt);
+		cout << pkt.pts << "   " << flush;
+	}
 
 
 	getchar();
